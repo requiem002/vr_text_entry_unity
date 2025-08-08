@@ -2,7 +2,7 @@ using UnityEngine;
 using Unity.Sentis;
 using System.Collections.Generic;
 using System.Linq;
-
+using System.Collections;
 
 
 //worker = SentisWorkerFactory.CreateWorker(SentisBackendType.GPUCompute, runtimeModel);
@@ -24,6 +24,10 @@ public class TapDetector : MonoBehaviour
     private const int windowSize = 100;
     private const int numFeatures = 3;
 
+    [Header("Feedback UI")]
+    [Tooltip("A UI element (e.g., an Image) to show when a tap is detected.")]
+    public GameObject tapIndicator; // <-- NEW: Reference to our UI element
+
     private readonly Queue<float[]> featureWindow = new Queue<float[]>();
     private Vector3 lastPosition, lastVelocity;
     private float lastTimestamp;
@@ -40,6 +44,11 @@ public class TapDetector : MonoBehaviour
 
         worker = new Worker(runtimeModel, BackendType.GPUCompute); // or BackendType.CPU
 
+        // Make sure the indicator is off at the start
+        if (tapIndicator != null)
+        {
+            tapIndicator.SetActive(false);
+        }
 
         for (int i = 0; i < windowSize; i++)
             featureWindow.Enqueue(new float[numFeatures]);
@@ -57,7 +66,12 @@ public class TapDetector : MonoBehaviour
 
         var indexTipBone = rightHandSkeleton.Bones
             .FirstOrDefault(b => b.Id == OVRSkeleton.BoneId.Hand_IndexTip);
-        if (indexTipBone == null) return;
+
+        if (indexTipBone == null)
+        {
+            Debug.Log("Could not find Index Tip Bone!");
+            return;
+        }
 
         Vector3 currentPosition = indexTipBone.Transform.position;
         float currentTimestamp = Time.time;
@@ -110,8 +124,26 @@ public class TapDetector : MonoBehaviour
         if (prediction > detectionThreshold)
             Debug.Log($"TAP DETECTED! Confidence: {prediction:P0}");
 
+            // --- NEW: Trigger the visual feedback ---
+            if (tapIndicator != null && !tapIndicator.activeInHierarchy)
+            {
+                StartCoroutine(ShowTapIndicator());
+            }
+
+        
+
         lastPosition = currentPosition;
         lastVelocity = currentVelocity;
         lastTimestamp = currentTimestamp;
+    }
+
+    // --- NEW: Coroutine to show the indicator for a short time ---
+    private IEnumerator ShowTapIndicator()
+    {
+        Debug.Log("Showing tap indicator");
+        tapIndicator.SetActive(true);
+        // Wait for 0.1 seconds
+        yield return new WaitForSeconds(0.05f);
+        tapIndicator.SetActive(false);
     }
 }
